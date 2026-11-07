@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+.pytest_cache/
+pruebas/
+*.corregido.docx
+*.report.json
+.DS_Store
+rules/style_rules.yaml
+tests/test_private_rules.py

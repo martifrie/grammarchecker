@@ -1,0 +1,29 @@
+# Local, free services for GrammarChecker.
+#   docker compose up -d
+#   docker compose exec ollama ollama pull qwen3:14b
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    # Uncomment if you have an NVIDIA GPU + nvidia-container-toolkit:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  languagetool:
+    image: erikvl87/languagetool:latest
+    ports:
+      - "8010:8010"
+    environment:
+      - Java_Xms=512m
+      - Java_Xmx=2g
+
+volumes:
+  ollama:
