@@ -1,0 +1,183 @@
+# Example rulebook: a small, generic set of rules that shows every feature of the engine.
+# Used by the tests and as a template: copy it and replace the rules with your own.
+#
+# Rule types:
+#   regex        applied by code, deterministic, no LLM (pattern + replacement, or `words`)
+#   quotes       checks quote nesting levels
+#   consistency  flags proper names spelled more than one way
+#   llm          proposed by the corrector agent, verified by the critic agent
+# mode: fix  -> tracked change      flag -> highlight + comment, text untouched
+# when / unless: the rule only applies if the paragraph matches (or doesn't match) this regex
+# group: llm rules are sent to the model in groups so each prompt stays short
+#
+# Regex rules: `pattern` (Python re, MULTILINE) and `replacement` (supports \1, \2...).
+# `examples` document the rule and are also sent to the LLM.
+#
+# Safety checks for llm rules (the code rejects any proposal that fails them):
+#   guard             regex the corrected text must match where it changed
+#   preserve          characters whose count the edit may not change
+#   only_punctuation  the edit may not add, remove or change any letter or digit
+
+name: "Example rules"
+author_tag: "GrammarChecker"   # shown as the author of the tracked changes in Word
+languagetool_lang: "es"        # LanguageTool: es, es-AR, es-MX... depending on availability
+
+notes: |
+  - Texto en español latinoamericano: respetar el voseo y los regionalismos del autor.
+  - Corregir solo lo que pide cada regla, sin reescribir ni cambiar la voz del autor.
+
+# Every mark is highlighted in its category's color (Word highlight palette:
+# yellow, green, cyan, magenta, blue, red, darkBlue, darkCyan, darkGreen, darkMagenta,
+# darkRed, darkYellow, lightGray, darkGray, black). Longest matching prefix wins.
+categories:
+  - {name: "Ortotipografía", color: cyan,      prefixes: ["OT"]}
+  - {name: "Diálogos",       color: green,     prefixes: ["DI"]}
+  - {name: "Puntuación",     color: magenta,   prefixes: ["PU"]}
+  - {name: "Gramática",      color: yellow,    prefixes: ["GR", "LT:"]}
+  - {name: "Nombres",        color: blue,      prefixes: ["NM"]}
+  - {name: "Estilo",         color: lightGray, prefixes: ["ES"]}
+
+rules:
+  # ---------- Typography (regex) ----------
+  - id: OT-01
+    type: regex
+    description: "Diálogos con raya (—), nunca con guion (-) ni semirraya (–) al inicio del párrafo."
+    pattern: '^[-–]\s*'
+    replacement: '—'
+
+  - id: OT-06
+    type: regex
+    description: "Incisos del narrador en diálogos con raya (—), no con guion."
+    pattern: '(?<=[?!.,…]) [-–](?=\w)'
+    replacement: ' —'
+
+  - id: OT-02
+    type: regex
+    description: "Puntos suspensivos como carácter único (…)."
+    pattern: '\.\.\.'
+    replacement: '…'
+
+  - id: OT-03
+    type: regex
+    description: "Sin espacios dobles."
+    pattern: '(?<=\S) {2,}(?=\S)'
+    replacement: ' '
+
+  - id: OT-04
+    type: regex
+    description: "Sin espacio antes de coma, punto, punto y coma o dos puntos."
+    pattern: ' +(?=[,.;:])'
+    replacement: ''
+
+  - id: OT-05
+    type: regex
+    description: "Comillas latinas «» en lugar de comillas rectas dobles."
+    pattern: '"([^"\n]+)"'
+    replacement: '«\1»'
+
+  - id: OT-07
+    type: quotes
+    description: "Comillas anidadas: primero «», dentro “”, y dentro de esas ‘’."
+    levels: [["«", "»"], ["“", "”"], ["‘", "’"]]
+
+  - id: OT-08
+    type: regex
+    format: italic        # the fix is formatting (tracked), the text doesn't change
+    ignore_case: true
+    description: "Expresiones latinas en cursiva."
+    pattern: '(?<!\w)(a priori|a posteriori|de facto|per se|in situ|grosso modo|sui generis)(?!\w)'
+
+  - id: OT-09
+    type: regex
+    mode: flag            # suggestion only: highlighted and commented, text untouched
+    description: "Evitar signos de exclamación o interrogación repetidos (!!!, ???); alcanza con uno."
+    pattern: '([!?])\1{2,}'
+    replacement: '\1'
+
+  # ---------- Names (consistency) ----------
+  - id: NM-01
+    type: consistency
+    mode: flag
+    description: "Un mismo nombre propio escrito de más de una forma."
+
+  # ---------- Grammar and style (LLM) ----------
+  - id: GR-01
+    type: llm
+    description: "Variante latinoamericana: usar 'ustedes', nunca 'vosotros' ni sus formas verbales."
+    examples:
+      wrong: "¿Vosotros venís mañana?"
+      right: "¿Ustedes vienen mañana?"
+
+  - id: GR-02
+    type: llm
+    description: "Evitar el dequeísmo y el queísmo."
+    examples:
+      wrong: "Pienso de que tenés razón."
+      right: "Pienso que tenés razón."
+
+  - id: GR-03
+    type: llm
+    description: "'solo' (adverbio) y los demostrativos (este, ese, aquel) van sin tilde (RAE 2010)."
+    examples:
+      wrong: "Sólo quería ver ésta casa."
+      right: "Solo quería ver esta casa."
+
+  - id: GR-04
+    type: llm
+    description: "Concordancia de género y número entre sustantivo, adjetivo y verbo."
+    examples:
+      wrong: "Las casas estaba vacío."
+      right: "Las casas estaban vacías."
+
+  - id: GR-05
+    type: llm
+    description: "Respetar el voseo del autor en los diálogos. No convertir 'vos' en 'tú' ni al revés; solo corregir mezclas dentro de un mismo personaje."
+    examples:
+      wrong: "Vos tienes que venir."
+      right: "Vos tenés que venir."
+
+  - id: GR-06
+    type: llm
+    description: "Números del uno al noventa y nueve se escriben con letras en la narración (no en fechas ni horas)."
+    examples:
+      wrong: "Tenía 23 años."
+      right: "Tenía veintitrés años."
+
+  # ---------- Punctuation (LLM, with safety checks) ----------
+  - id: PU-01
+    type: llm
+    group: puntuacion
+    only_punctuation: true
+    description: "Coma delante de «pero» y «sino» cuando unen dos partes de la oración. La coma va antes, nunca después."
+    examples:
+      - {wrong: "Quería salir pero llovía.", right: "Quería salir, pero llovía."}
+      - {wrong: "No era tristeza sino cansancio.", right: "No era tristeza, sino cansancio."}
+    guard: ',\s*(pero|sino)\b'
+
+  - id: PU-02
+    type: llm
+    group: puntuacion
+    only_punctuation: true
+    description: "El vocativo (el nombre de a quien se le habla) va separado por comas."
+    examples:
+      - {wrong: "Vení Lucía que se enfría.", right: "Vení, Lucía, que se enfría."}
+    guard: ',\s*[A-ZÁÉÍÓÚÑ]|[A-ZÁÉÍÓÚÑ]\w*,'
+
+  # ---------- Dialogue (LLM, with safety checks) ----------
+  - id: DI-01
+    type: llm
+    group: dialogos
+    preserve: "—"         # may fix the period and capitalization, never add or remove dashes
+    description: "Si después del parlamento viene un verbo de habla (dijo, preguntó, susurró...), no va punto antes de la raya y el comentario empieza en minúscula."
+    examples:
+      - {wrong: "—Ya llegué. —Dijo Tomás.", right: "—Ya llegué —dijo Tomás."}
+    guard: '\s—[a-záéíóúñ]'
+
+  # ---------- Style (LLM, suggestions only) ----------
+  - id: ES-01
+    type: llm
+    group: estilo
+    mode: flag
+    description: "La misma palabra repetida dentro de una oración corta, cuando hay un sinónimo natural."
+    examples:
+      - {wrong: "Abrió la puerta y miró la puerta del frente.", right: "Abrió la puerta y miró la del frente."}
